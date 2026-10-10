@@ -1,65 +1,63 @@
 # Snapmaker U1 Heat Soak
 
-Klipper G-code macro to warm an enclosed **Snapmaker U1** before ABS/ASA printing, using the **Top Cover's internal recirculation/filtration fan** (not the separate `cavity_fan`).
+Klipper heat-soak macro for ABS/ASA on the **Snapmaker U1**, now using the **cavity/curtain air fan** (`cavity_fan`) instead of the optional Top Cover purifier.
 
-> **v0.1.0 — Experimental, not yet hardware-tested.** Manually verify compatibility with your installed U1 firmware before automating print start.
+> **v0.2.0 — experimental / not hardware-tested.** Verify actual fan behavior and firmware support before adding the macro to your print-start sequence. The auxiliary fan may cool the chamber rather than warm it depending on airflow.
 
-## Features
+## How it works
 
-- Bed target: 0–100 °C (default: 100 °C).
-- Timed soak: 1–120 minutes (default: 30 minutes).
-- Top Cover fan speed: 10–100% (default: 40%).
-- Soak timer begins only after the bed reaches temperature.
-- Reports final chamber temperature from `temperature_sensor cavity`.
-- Top Cover internal recirculation via `SET_PURIFIER_MODE MODE=3`.
+1. Start the cavity/curtain fan using `SET_FAN_SPEED FAN=cavity_fan SPEED=...`.
+2. Heat the bed using `M190`, waiting until the setpoint is reached.
+3. Hold the bed temperature for a configurable number of minutes using `G4`.
+4. Stop the cavity fan and report final chamber temperature using `temperature_sensor cavity`.
+
+The Top Cover recirculation/filtration fan is **not controlled** by this version. The heated bed remains on after the soak, so printing can follow.
 
 ## Installation
 
-1. Back up your existing printer configuration.
-2. Copy [heat_soak.cfg](heat_soak.cfg) into the printer's Klipper configuration directory.
-3. Add `[include heat_soak.cfg]` to `printer.cfg` if supported by your firmware.
-4. Reload the configuration (typically `RESTART`).
-5. Perform a short **attended** test with the Top Cover installed. Verify internal recirculation operates as expected.
-
-The U1's configuration and ability to edit it may differ with firmware versions. The macro requires `SET_PURIFIER_MODE`, `RESPOND`, and the `cavity` temperature sensor.
+1. Back up the printer's Klipper configuration.
+2. Copy [heat_soak.cfg](heat_soak.cfg) into the configuration directory.
+3. Add `[include heat_soak.cfg]` to `printer.cfg` if your firmware allows includes, then reload the config.
+4. Verify `[fan_generic cavity_fan]` and `[temperature_sensor cavity]` are present in the U1 firmware.
+5. Run a short **attended** test, confirm fan direction and that temperature readings work.
 
 ## Usage
 
-Standard ABS/ASA starting point:
-
 ```gcode
-HEAT_SOAK BED=100 MINUTES=30 FAN=0.4
+HEAT_SOAK BED=100 MINUTES=20 FAN=0.4
 ```
 
-Brief attended test:
+This waits for a 100°C bed and then soaks for 20 minutes with the cavity fan at 40%, before switching that fan off.
+
+Short test:
 
 ```gcode
-HEAT_SOAK BED=60 MINUTES=2 FAN=0.4
+HEAT_SOAK BED=60 MINUTES=2 FAN=0.2
 ```
 
-The macro leaves the bed heated at completion so printing can begin. Call the macro manually first; only add it to your Snapmaker Orca print-start sequence once you have verified that any slicer-issued purifier commands do not override fan settings.
+Parameters: `BED` 0–100°C (default 100); `MINUTES` 1–120 (default 30); `FAN` 0.0–1.0 (default 0.4).
 
-## Important limitations and safety
+## Limitations / safety
 
-- This is a **fixed-time soak**, not an automatic chamber-target wait. The chamber temperature is only reported at the end.
-- The 120-minute limit applies to the soak dwell only; the bed warm-up time (`M190`) is additional and can take longer.
-- The `G4` dwell blocks the macro; it is not a separately cancellable background timer. Test the printer's normal cancellation behavior.
-- At the end the macro sets idle timeout to 600 seconds, a common default. Change this to your printer's configured value if different.
-- The exact behavior of `SET_PURIFIER_MODE` depends on your U1 firmware. Ensure fan circulation does not unintentionally exhaust the warm enclosure.
-- Do not leave the machine unattended during initial testing. Follow appropriate ventilation and manufacturer precautions for ABS/ASA.
-- The macro intentionally does not disable heating after the soak; monitor the printer.
+- The published U1 bed heater config limits temperature to 100°C. **Do not bypass hardware/firmware temperature limits.**
+- This macro runs a **fixed duration**; it does not wait for a specified chamber temperature.
+- The 120-minute cap limits only the soak dwell. `M190` preheating time is extra.
+- The `G4` dwell is blocking, not a cancellable background timer; test your usual stop/cancel sequence.
+- The macro turns off `cavity_fan` at the end rather than restoring its previous speed. It resets idle timeout to 600 seconds; edit this if your printer has a different default.
+- The U1's auxiliary fan may change enclosure airflow and cooling, so compare chamber temperatures during testing with it enabled and disabled.
+- It leaves the heated bed active after finishing. Supervise initial tests and follow ventilation guidance for ABS/ASA.
 
-## Compatibility references
+## Upstream reference
 
-- [Snapmaker official U1 Klipper configuration](https://github.com/Snapmaker/u1-klipper/blob/main/lava/printer.cfg) — documents the bed heater (100 °C max), `temperature_sensor cavity`, and `purifier` subsystem.
-- Firmware behavior may change. Check the commands supported by your exact version.
+[Snapmaker U1 Klipper configuration](https://github.com/Snapmaker/u1-klipper/blob/main/lava/printer.cfg) — check for `[fan_generic cavity_fan]`, `[temperature_sensor cavity]` and bed heater limits. Firmware variants may differ.
 
-## Roadmap
+## Future improvements
 
-- Validate on real U1 hardware and specific firmware versions.
-- Optional chamber-temperature threshold with timeout and stabilization period.
-- Better cancellation, idle-timeout restoration, and slicer integration.
+- Hardware validation and firmware compatibility notes.
+- Chamber temperature threshold and bounded timeout.
+- Nonblocking cancellation and prior state restoration.
+- Snapmaker Orca integration.
 
 ## License
 
-[GNU GPL v3.0](LICENSE). Unofficial community project; not affiliated with or endorsed by Snapmaker.
+[GPL-3.0](LICENSE). Unofficial community project, not endorsed by Snapmaker.
