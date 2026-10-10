@@ -1,63 +1,63 @@
 # Snapmaker U1 Heat Soak
 
-Klipper heat-soak macro for ABS/ASA on the **Snapmaker U1**, now using the **cavity/curtain air fan** (`cavity_fan`) instead of the optional Top Cover purifier.
+Experimental Klipper heat soak for ABS/ASA on the **Snapmaker U1** using the **cavity/curtain air fan** (`cavity_fan`), not the Top Cover purifier.
 
-> **v0.2.0 — experimental / not hardware-tested.** Verify actual fan behavior and firmware support before adding the macro to your print-start sequence. The auxiliary fan may cool the chamber rather than warm it depending on airflow.
+**v0.3.0 — untested on physical hardware.** This version replaces blocking `M190` and `G4` with a cancelable 2-second `delayed_gcode` loop.
 
-## How it works
+## Commands
 
-1. Start the cavity/curtain fan using `SET_FAN_SPEED FAN=cavity_fan SPEED=...`.
-2. Heat the bed using `M190`, waiting until the setpoint is reached.
-3. Hold the bed temperature for a configurable number of minutes using `G4`.
-4. Stop the cavity fan and report final chamber temperature using `temperature_sensor cavity`.
+| Command | Behavior |
+| --- | --- |
+| `HEAT_SOAK BED=100 MINUTES=20 FAN=0.4` | Begin heating, then soak 20 minutes after bed reaches target (within 1°C) |
+| `HEAT_SOAK_STATUS` | Report phase, temperatures and approximate remaining time |
+| `CANCEL_HEAT_SOAK` | Cancel and switch off bed and cavity fan |
+| `CANCEL_HEAT_SOAK KEEP_BED=1` | Cancel and stop fan, **leave bed at existing target** |
 
-The Top Cover recirculation/filtration fan is **not controlled** by this version. The heated bed remains on after the soak, so printing can follow.
+**If the bed temperature is changed by another command while heat soak is active**, the macro automatically stops within approximately 2 seconds, switches off the cavity fan, and **preserves the newly chosen bed target**. To guarantee both heaters and the macro stop, use `CANCEL_HEAT_SOAK`; do not rely on temperature adjustment as a substitute for cancellation.
+
+For example, during a soak:
+
+```gcode
+M140 S90
+```
+
+The macro detects the new 90°C setpoint and cancels itself without setting the bed back to 100°C. Conversely `M140 S0` sets the bed off, and the macro cancels shortly afterward.
 
 ## Installation
 
-1. Back up the printer's Klipper configuration.
-2. Copy [heat_soak.cfg](heat_soak.cfg) into the configuration directory.
-3. Add `[include heat_soak.cfg]` to `printer.cfg` if your firmware allows includes, then reload the config.
-4. Verify `[fan_generic cavity_fan]` and `[temperature_sensor cavity]` are present in the U1 firmware.
-5. Run a short **attended** test, confirm fan direction and that temperature readings work.
-
-## Usage
-
-```gcode
-HEAT_SOAK BED=100 MINUTES=20 FAN=0.4
-```
-
-This waits for a 100°C bed and then soaks for 20 minutes with the cavity fan at 40%, before switching that fan off.
-
-Short test:
+1. Back up printer configuration.
+2. Copy [heat_soak.cfg](heat_soak.cfg) into your Klipper config directory.
+3. Include it with `[include heat_soak.cfg]`, if firmware permits, and restart Klipper.
+4. Confirm printer supports `[fan_generic cavity_fan]`, `[temperature_sensor cavity]`, `[delayed_gcode]`, and `RESPOND`.
+5. Perform an attended short test:
 
 ```gcode
 HEAT_SOAK BED=60 MINUTES=2 FAN=0.2
+HEAT_SOAK_STATUS
+CANCEL_HEAT_SOAK
 ```
 
-Parameters: `BED` 0–100°C (default 100); `MINUTES` 1–120 (default 30); `FAN` 0.0–1.0 (default 0.4).
+## Parameters / behavior
 
-## Limitations / safety
+- `BED`: 1–100°C, default 100°C. U1 published config specifies max bed temperature 100°C.
+- `MINUTES`: 1–120 minutes, default 30. Soak begins within approximately 1°C of setpoint.
+- `FAN`: 0–1, default 0.4.
+- `HEAT_TIMEOUT`: 1–120 minutes, default 45. If bed does not reach target in this time, stops soak **and disables bed heater**.
+- Completion leaves bed heater on at the selected target but stops cavity fan. It restores the configured idle timeout.
+- Cancel default stops the bed heater and fan. `KEEP_BED=1` leaves the current bed target unchanged.
+- The status remaining-time estimate is rounded and based on 2-second ticks; actual time may differ slightly under printer load.
+- Changing the bed target by more than 0.5°C triggers automatic stop on the next tick, without overwriting that new target.
+- Do not run when a print is active. Initial firmware compatibility and cancellation response are unverified.
 
-- The published U1 bed heater config limits temperature to 100°C. **Do not bypass hardware/firmware temperature limits.**
-- This macro runs a **fixed duration**; it does not wait for a specified chamber temperature.
-- The 120-minute cap limits only the soak dwell. `M190` preheating time is extra.
-- The `G4` dwell is blocking, not a cancellable background timer; test your usual stop/cancel sequence.
-- The macro turns off `cavity_fan` at the end rather than restoring its previous speed. It resets idle timeout to 600 seconds; edit this if your printer has a different default.
-- The U1's auxiliary fan may change enclosure airflow and cooling, so compare chamber temperatures during testing with it enabled and disabled.
-- It leaves the heated bed active after finishing. Supervise initial tests and follow ventilation guidance for ABS/ASA.
+## Safety
 
-## Upstream reference
+This macro is **not yet hardware-validated**. The cavity fan might cool the chamber depending on airflow; compare chamber temperature with and without it. Temperature changing isn't always an emergency stop; use printer's physical stop if required. A firmware restart, system fault, or unexpected interruption may leave heater/fan state different from what the macro expects. Never leave the printer unattended during initial tests. Follow manufacturer temperature limits and ABS/ASA ventilation practices.
 
-[Snapmaker U1 Klipper configuration](https://github.com/Snapmaker/u1-klipper/blob/main/lava/printer.cfg) — check for `[fan_generic cavity_fan]`, `[temperature_sensor cavity]` and bed heater limits. Firmware variants may differ.
+## Sources
 
-## Future improvements
-
-- Hardware validation and firmware compatibility notes.
-- Chamber temperature threshold and bounded timeout.
-- Nonblocking cancellation and prior state restoration.
-- Snapmaker Orca integration.
+- [Snapmaker U1 Klipper configuration](https://github.com/Snapmaker/u1-klipper/blob/main/lava/printer.cfg)
+- [Klipper: Command templates and delayed_gcode](https://www.klipper3d.org/Command_Templates.html)
 
 ## License
 
-[GPL-3.0](LICENSE). Unofficial community project, not endorsed by Snapmaker.
+[GNU GPL v3.0](LICENSE). Unofficial community project.
