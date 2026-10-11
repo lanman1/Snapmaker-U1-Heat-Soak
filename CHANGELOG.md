@@ -1,19 +1,25 @@
 # Changelog
 
+## v0.4.0 — 2026-10-11
+
+- Add optional chamber target (`CHAMBER`) and continuous stabilization period (`STABILIZE`).
+- Add overall `MAX_TIME` limit including warmup.
+- Add `HEAT_SOAK_PRINT_GATE` experimental print-start PAUSE/RESUME integration.
+- Print gate holds submitted print after cancellation or timeout; never auto-releases failed soaks.
+- Add `HEAT_SOAK_CLEAR` gate recovery command and expanded status reporting.
+- Preserve cancel behavior, cavity fan control, and changed-bed-target detection.
+- Update comprehensive installation, Snapmaker Orca start-code, and validation instructions.
+
+**Hardware verification: pending. Pause/resume start-code behavior requires testing.**
+
 ## v0.3.0 — 2026-10-10
 
-- Replace blocking bed warmup and dwell with nonblocking delayed G-code checks.
-- Add `CANCEL_HEAT_SOAK`, optional `KEEP_BED=1`, and `HEAT_SOAK_STATUS`.
-- Automatically cancel without overriding the user's newly selected bed target.
-- Add bed warmup timeout and protections against multiple simultaneous soaks.
-- Restore configured idle timeout; stop cavity fan during cleanup.
-- Experimental, hardware validation pending.
+- Nonblocking delayed G-code heat-soak polling; cancel/status commands.
 
 ## v0.2.0 — 2026-10-10
 
-- Switch fan control to cavity/curtain fan `cavity_fan`.
-- Stop cavity fan when completed and update documentation.
+- Switch to cavity/curtain fan control (`cavity_fan`).
 
 ## v0.1.0 — 2026-10-10
 
-- Initial experimental timed soak using Top Cover internal circulation.
+- Initial experimental timed soak using Top Cover purifier.
